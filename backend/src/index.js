@@ -8,10 +8,11 @@ import cors from "cors";
 import path from "path";
 import { connentDB } from "./lib/db.js";
 import { app, server } from "./lib/socket.js";
-const PORT = process.env.PORT;
-const  __dirname = path.resolve()
 
 dotenv.config();
+const PORT = process.env.PORT || 5001;
+const  __dirname = path.resolve()
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
