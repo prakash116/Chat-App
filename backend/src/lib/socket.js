@@ -12,20 +12,43 @@ const io = new Server(server, {
 });
 
 export function getReceiverSocketId(userId) {
-  return userSocketMap[userId];
+  return Array.from(userSocketMap[userId] || [])[0];
+}
+
+export function getReceiverSocketIds(userId) {
+  return Array.from(userSocketMap[userId] || []);
 }
 
 const userSocketMap = {}; //
+
+function getOnlineUserIds() {
+  return Object.keys(userSocketMap);
+}
+
+function emitOnlineUsers() {
+  const onlineUserIds = getOnlineUserIds();
+  io.emit("getOnlineUsers", onlineUserIds);
+  io.emit("getOnileUsers", onlineUserIds);
+}
+
 io.on("connection", (socket) => {
   console.log("New client connected", socket.id);
 
   const userId = socket.handshake.query.userId;
   if (userId) {
-    userSocketMap[userId] = socket.id;
+    if (!userSocketMap[userId]) {
+      userSocketMap[userId] = new Set();
+    }
+    userSocketMap[userId].add(socket.id);
   }
 
   // io.emit() is used to send events to all the connected clients
-  io.emit("getOnileUsers", Object.keys(userSocketMap));
+  emitOnlineUsers();
+
+  socket.on("online:request", () => {
+    socket.emit("getOnlineUsers", getOnlineUserIds());
+    socket.emit("getOnileUsers", getOnlineUserIds());
+  });
 
   socket.on("call:offer", ({ to, from, offer, callerName, callType = "video" }) => {
     const receiverSocketId = getReceiverSocketId(to);
@@ -69,8 +92,13 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("Client disconnected", socket.id);
-    delete userSocketMap[userId];
-    io.emit("getOnileUsers", Object.keys(userSocketMap));
+    if (userId && userSocketMap[userId]) {
+      userSocketMap[userId].delete(socket.id);
+      if (userSocketMap[userId].size === 0) {
+        delete userSocketMap[userId];
+      }
+    }
+    emitOnlineUsers();
   });
 });
 
