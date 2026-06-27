@@ -36,9 +36,11 @@ function emitOnlineUsers() {
 }
 
 function emitToUser(userId, event, payload) {
-  getReceiverSocketIds(userId).forEach((socketId) => {
+  const socketIds = getReceiverSocketIds(userId);
+  socketIds.forEach((socketId) => {
     io.to(socketId).emit(event, payload);
   });
+  return socketIds.length;
 }
 
 io.on("connection", (socket) => {
@@ -60,29 +62,37 @@ io.on("connection", (socket) => {
     socket.emit("getOnileUsers", getOnlineUserIds());
   });
 
-  socket.on("call:offer", ({ to, from, offer, callerName, callType = "video" }) => {
-    emitToUser(to, "call:incoming", {
+  socket.on("call:offer", ({ to, from, offer, callerName, callType = "video", callId }) => {
+    const delivered = emitToUser(to, "call:incoming", {
       from,
       offer,
       callerName,
       callType,
+      callId,
     });
+    if (delivered === 0) {
+      socket.emit("call:unavailable", { callId });
+    }
   });
 
-  socket.on("call:answer", ({ to, answer }) => {
-    emitToUser(to, "call:answer", { answer });
+  socket.on("call:answer", ({ to, from, answer, callId }) => {
+    emitToUser(to, "call:answer", { from, answer, callId });
   });
 
-  socket.on("call:ice-candidate", ({ to, candidate }) => {
-    emitToUser(to, "call:ice-candidate", { candidate });
+  socket.on("call:ice-candidate", ({ to, from, candidate, callId }) => {
+    emitToUser(to, "call:ice-candidate", { from, candidate, callId });
   });
 
-  socket.on("call:reject", ({ to }) => {
-    emitToUser(to, "call:rejected");
+  socket.on("call:busy", ({ to, callId }) => {
+    emitToUser(to, "call:busy", { callId });
   });
 
-  socket.on("call:end", ({ to }) => {
-    emitToUser(to, "call:ended");
+  socket.on("call:reject", ({ to, callId }) => {
+    emitToUser(to, "call:rejected", { callId });
+  });
+
+  socket.on("call:end", ({ to, callId }) => {
+    emitToUser(to, "call:ended", { callId });
   });
 
   socket.on("disconnect", () => {
