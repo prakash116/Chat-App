@@ -7,7 +7,45 @@ export const getUsersForSidebar = async (req, res) => {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({
       _id: { $ne: loggedInUserId },
-    }).select("-password");
+    })
+      .select("-password")
+      .lean();
+
+    const conversations = await Message.find({
+      $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
+    })
+      .sort({ createdAt: -1 })
+      .select("senderId receiverId createdAt")
+      .lean();
+
+    const lastMessageByUser = new Map();
+    conversations.forEach((message) => {
+      const senderId = message.senderId.toString();
+      const receiverId = message.receiverId.toString();
+      const peerId =
+        senderId === loggedInUserId.toString() ? receiverId : senderId;
+
+      if (!lastMessageByUser.has(peerId)) {
+        lastMessageByUser.set(peerId, message.createdAt);
+      }
+    });
+
+    filteredUsers.sort((first, second) => {
+      const firstLastMessageAt = lastMessageByUser.get(first._id.toString());
+      const secondLastMessageAt = lastMessageByUser.get(second._id.toString());
+
+      if (!firstLastMessageAt && !secondLastMessageAt) {
+        return first.fullName.localeCompare(second.fullName);
+      }
+      if (!firstLastMessageAt) {
+        return 1;
+      }
+      if (!secondLastMessageAt) {
+        return -1;
+      }
+      return secondLastMessageAt - firstLastMessageAt;
+    });
+
     res.status(200).json(filteredUsers);
   } catch (error) {
     console.log("Error in getUsersForSidebar", error.message);
