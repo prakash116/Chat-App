@@ -35,6 +35,12 @@ function emitOnlineUsers() {
   io.emit("getOnileUsers", onlineUserIds);
 }
 
+function emitToUser(userId, event, payload) {
+  getReceiverSocketIds(userId).forEach((socketId) => {
+    io.to(socketId).emit(event, payload);
+  });
+}
+
 io.on("connection", (socket) => {
   console.log("New client connected", socket.id);
 
@@ -55,43 +61,28 @@ io.on("connection", (socket) => {
   });
 
   socket.on("call:offer", ({ to, from, offer, callerName, callType = "video" }) => {
-    const receiverSocketId = getReceiverSocketId(to);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("call:incoming", {
-        from,
-        offer,
-        callerName,
-        callType,
-      });
-    }
+    emitToUser(to, "call:incoming", {
+      from,
+      offer,
+      callerName,
+      callType,
+    });
   });
 
   socket.on("call:answer", ({ to, answer }) => {
-    const receiverSocketId = getReceiverSocketId(to);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("call:answer", { answer });
-    }
+    emitToUser(to, "call:answer", { answer });
   });
 
   socket.on("call:ice-candidate", ({ to, candidate }) => {
-    const receiverSocketId = getReceiverSocketId(to);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("call:ice-candidate", { candidate });
-    }
+    emitToUser(to, "call:ice-candidate", { candidate });
   });
 
   socket.on("call:reject", ({ to }) => {
-    const receiverSocketId = getReceiverSocketId(to);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("call:rejected");
-    }
+    emitToUser(to, "call:rejected");
   });
 
   socket.on("call:end", ({ to }) => {
-    const receiverSocketId = getReceiverSocketId(to);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("call:ended");
-    }
+    emitToUser(to, "call:ended");
   });
 
   socket.on("disconnect", () => {
